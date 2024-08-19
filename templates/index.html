@@ -3,13 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tic-Tac-Toe</title>
+    <title>Join Tic-Tac-Toe Room</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>Welcome to Tic-Tac-Toe</h1>
-    <form id="join-room-form" action="/room" method="get">
-        <input type="text" name="room_id" placeholder="Enter Room ID">
-        <button type="submit">Join Room</button>
-    </form>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="text-center">
+        <h1 class="text-4xl font-bold mb-8">Join a Tic-Tac-Toe Room</h1>
+        <form id="join-room-form" class="space-y-4">
+            <input type="text" name="room_id" id="room_id" placeholder="Enter Room ID" 
+                   class="block w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="board_size" class="block w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="3">3x3</option>
+                <option value="4">4x4</option>
+                <option value="5">5x5</option>
+            </select>
+            <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded">Join Room</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('join-room-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const roomId = document.getElementById('room_id').value;
+            const boardSize = document.getElementById('board_size').value;
+            if (roomId) {
+                window.location.href = `/room/${roomId}/${boardSize}`;
+            }
+        });
+    </script>
 </body>
 </html>

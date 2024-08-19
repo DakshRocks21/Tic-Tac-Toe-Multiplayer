@@ -1,20 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tic-Tac-Toe Room</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
     <style>
         .grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
-            max-width: 300px;
             margin: 20px auto;
         }
+
         .cell {
-            width: 100px;
-            height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -24,40 +23,67 @@
             border: 2px solid #333;
             cursor: pointer;
         }
+
         .disabled {
             pointer-events: none;
             background-color: #ddd;
         }
     </style>
 </head>
-<body>
-    <h1>Tic-Tac-Toe - Room {{ room_id }}</h1>
-    <p id="status">Waiting for players...</p>
-    <div id="game" class="grid">
-        <div class="cell" data-index="0"></div>
-        <div class="cell" data-index="1"></div>
-        <div class="cell" data-index="2"></div>
-        <div class="cell" data-index="3"></div>
-        <div class="cell" data-index="4"></div>
-        <div class="cell" data-index="5"></div>
-        <div class="cell" data-index="6"></div>
-        <div class="cell" data-index="7"></div>
-        <div class="cell" data-index="8"></div>
+
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="text-center">
+        <h1 class="text-4xl font-bold mb-6">Tic-Tac-Toe - Room {{ room_id }}</h1>
+        <p id="status" class="mb-4 text-xl"></p>
+        <div id="game" class="grid"></div>
+        <button id="rematch-button" class="mt-6 bg-green-500 text-white px-4 py-2 rounded hidden">Rematch</button>
+        <button id="leave-room" class="mt-6 bg-red-500 text-white px-4 py-2 rounded">Leave Room</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
         const socket = io();
-        const cells = document.querySelectorAll('.cell');
         const roomId = "{{ room_id }}";
+        const grid = document.getElementById('game');
+        const rematchButton = document.getElementById('rematch-button');
         let playerNumber;
         let turn = 1;
+        let boardSize = '{{ size }}';
 
-        socket.emit('join', { room_id: roomId });
+        function createBoard(size) {
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            for (let i = 0; i < size * size; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.index = i;
+                grid.appendChild(cell);
+            }
+        }
+
+        socket.emit('join', { room_id: roomId, size: boardSize });
 
         socket.on('set_player', (number) => {
             playerNumber = number;
             document.getElementById('status').textContent = `You are Player ${playerNumber}`;
+        });
+
+        socket.on('spectator', (data) => {
+            boardSize = data.size;
+            createBoard(boardSize);
+            document.getElementById('status').textContent = 'Spectating...';
+            rematchButton.classList.add('hidden');
+        });
+
+        socket.on('room_joined', (data) => {
+            createBoard(data.size);
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach((cell, index) => {
+                if (data.board[index] !== '') {
+                    cell.textContent = data.board[index];
+                    cell.classList.add('disabled');
+                }
+            });
         });
 
         socket.on('move_made', (data) => {
@@ -69,18 +95,38 @@
             document.getElementById('status').textContent = `Player ${turn}'s turn`;
         });
 
-        cells.forEach(cell => {
-            cell.addEventListener('click', () => {
-                if (turn === playerNumber && !cell.classList.contains('disabled')) {
-                    const move = cell.dataset.index;
-                    socket.emit('make_move', { room_id: roomId, move: move });
-                }
-            });
+        socket.on('game_over', (data) => {
+            const winner = data.winner;
+            if (winner === 0) {
+                document.getElementById('status').textContent = "It's a draw!";
+            } else {
+                document.getElementById('status').textContent = `Player ${winner} wins!`;
+            }
+            rematchButton.classList.remove('hidden');
         });
 
-        socket.on('room_full', () => {
-            document.getElementById('status').textContent = 'Room is full';
+        rematchButton.addEventListener('click', () => {
+            socket.emit('rematch', { room_id: roomId });
+        });
+
+        socket.on('start_rematch', (data) => {
+            createBoard(data.size);
+            document.getElementById('status').textContent = 'Player 1\'s turn';
+            rematchButton.classList.add('hidden');
+        });
+
+        document.getElementById('leave-room').addEventListener('click', () => {
+            window.location.href = '/';
+        });
+
+        grid.addEventListener('click', (event) => {
+            const cell = event.target;
+            if (cell.classList.contains('cell') && turn === playerNumber && !cell.classList.contains('disabled')) {
+                const move = cell.dataset.index;
+                socket.emit('make_move', { room_id: roomId, move: move });
+            }
         });
     </script>
 </body>
+
 </html>
