@@ -1,14 +1,15 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, join_room, leave_room, emit
+import gevent.monkey
+
+gevent.monkey.patch_all()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
-
+socketio = SocketIO(app, async_mode='gevent')
 rooms = {}
 
 def check_winner(board, size):
-    # Check rows, columns and diagonals for a winner
     for i in range(size):
         if all(board[i*size + j] == board[i*size] and board[i*size] != '' for j in range(size)):
             return True
@@ -31,7 +32,8 @@ def room(room_id, size):
             'players': [],
             'board': [''] * (size * size),
             'size': size,
-            'turn': 1  # Player 1 starts
+            'turn': 1,  # Player 1 starts
+            'scores': {1: 0, 2: 0}
         }
     return render_template('room.html', room_id=room_id, size=size)
 
@@ -61,6 +63,7 @@ def handle_make_move(data):
         if rooms[room_id]['board'][move] == '':
             rooms[room_id]['board'][move] = 'X' if player['player_number'] == 1 else 'O'
             if check_winner(rooms[room_id]['board'], size):
+                rooms[room_id]['scores'][player['player_number']] += 1
                 emit('game_over', {'winner': player['player_number']}, room=room_id)
             elif all(cell != '' for cell in rooms[room_id]['board']):
                 emit('game_over', {'winner': 0}, room=room_id)
@@ -75,6 +78,13 @@ def handle_rematch(data):
     rooms[room_id]['board'] = [''] * (size * size)
     rooms[room_id]['turn'] = 1  # Player 1 starts
     emit('start_rematch', {'size': size}, room=room_id)
+
+@socketio.on('chat_message')
+def handle_chat_message(data):
+    room_id = data['room_id']
+    player = next((player for player in rooms[room_id]['players'] if player['sid'] == request.sid), None)
+    if player:
+        emit('receive_message', {'player': player['player_number'], 'message': data['message']}, room=room_id)
 
 @socketio.on('disconnect')
 def handle_disconnect():

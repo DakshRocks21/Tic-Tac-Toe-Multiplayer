@@ -9,35 +9,118 @@
     <style>
         .grid {
             display: grid;
-            gap: 10px;
+            gap: 8px;
             margin: 20px auto;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1;
         }
 
         .cell {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 3rem;
             font-weight: bold;
             background-color: #f0f0f0;
             border: 2px solid #333;
             cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s;
+        }
+
+        .cell:active {
+            transform: scale(0.95);
         }
 
         .disabled {
             pointer-events: none;
             background-color: #ddd;
         }
+
+        .player-turn {
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        .player1 {
+            color: #1d4ed8;
+        }
+
+        .player2 {
+            color: #f87171;
+        }
+        
+        #scoreboard {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 16px;
+        }
+
+        #scoreboard div {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        #chat-box {
+            margin-top: 16px;
+            max-width: 400px;
+        }
+
+        #messages {
+            border: 1px solid #ccc;
+            padding: 8px;
+            height: 150px;
+            overflow-y: scroll;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        #messages p {
+            margin: 4px 0;
+        }
+
+        #message-input {
+            display: flex;
+            margin-top: 8px;
+        }
+
+        #message-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px 0 0 4px;
+        }
+
+        #message-input button {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-left: none;
+            background-color: #1d4ed8;
+            color: white;
+            border-radius: 0 4px 4px 0;
+        }
     </style>
 </head>
 
 <body class="bg-gray-100 flex items-center justify-center h-screen">
     <div class="text-center">
-        <h1 class="text-4xl font-bold mb-6">Tic-Tac-Toe - Room {{ room_id }}</h1>
-        <p id="status" class="mb-4 text-xl"></p>
+        <h1 class="text-4xl font-bold mb-4">Tic-Tac-Toe - Room {{ room_id }}</h1>
+        <div id="scoreboard">
+            <div id="player1-score">Player 1: 0</div>
+            <div id="player2-score">Player 2: 0</div>
+        </div>
+        <p id="status" class="mb-4 text-xl player-turn"></p>
         <div id="game" class="grid"></div>
         <button id="rematch-button" class="mt-6 bg-green-500 text-white px-4 py-2 rounded hidden">Rematch</button>
         <button id="leave-room" class="mt-6 bg-red-500 text-white px-4 py-2 rounded">Leave Room</button>
+        
+        <div id="chat-box">
+            <div id="messages"></div>
+            <div id="message-input">
+                <input type="text" id="chat-message" placeholder="Type a message...">
+                <button id="send-message">Send</button>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
@@ -49,6 +132,8 @@
         let playerNumber;
         let turn = 1;
         let boardSize = '{{ size }}';
+        let player1Score = 0;
+        let player2Score = 0;
 
         function createBoard(size) {
             grid.innerHTML = '';
@@ -61,11 +146,17 @@
             }
         }
 
+        function updateScores() {
+            document.getElementById('player1-score').textContent = `Player 1: ${player1Score}`;
+            document.getElementById('player2-score').textContent = `Player 2: ${player2Score}`;
+        }
+
         socket.emit('join', { room_id: roomId, size: boardSize });
 
         socket.on('set_player', (number) => {
             playerNumber = number;
             document.getElementById('status').textContent = `You are Player ${playerNumber}`;
+            document.getElementById('status').classList.add(playerNumber === 1 ? 'player1' : 'player2');
         });
 
         socket.on('spectator', (data) => {
@@ -101,6 +192,9 @@
                 document.getElementById('status').textContent = "It's a draw!";
             } else {
                 document.getElementById('status').textContent = `Player ${winner} wins!`;
+                if (winner === 1) player1Score++;
+                if (winner === 2) player2Score++;
+                updateScores();
             }
             rematchButton.classList.remove('hidden');
         });
@@ -125,6 +219,53 @@
                 const move = cell.dataset.index;
                 socket.emit('make_move', { room_id: roomId, move: move });
             }
+        });
+
+        // Chat functionality
+        document.getElementById('send-message').addEventListener('click', () => {
+            const message = document.getElementById('chat-message').value;
+            if (message.trim() !== '') {
+                socket.emit('chat_message', { room_id: roomId, message });
+                document.getElementById('chat-message').value = '';
+            }
+        });
+
+        socket.on('receive_message', (data) => {
+            const messages = document.getElementById('messages');
+            const newMessage = document.createElement('p');
+            newMessage.textContent = `Player ${data.player}: ${data.message}`;
+            messages.appendChild(newMessage);
+            messages.scrollTop = messages.scrollHeight;
+        });
+
+        // Sound effects
+        function playSound(sound) {
+            const audio = new Audio(`/sounds/${sound}.mp3`);
+            audio.play();
+        }
+
+        socket.on('move_made', (data) => {
+            const { move, player } = data;
+            const cell = document.querySelector(`.cell[data-index='${move}']`);
+            cell.textContent = player === 1 ? 'X' : 'O';
+            cell.classList.add('disabled');
+            playSound('move');
+            turn = player === 1 ? 2 : 1;
+            document.getElementById('status').textContent = `Player ${turn}'s turn`;
+        });
+
+        socket.on('game_over', (data) => {
+            const winner = data.winner;
+            playSound(winner === 0 ? 'draw' : 'win');
+            if (winner === 0) {
+                document.getElementById('status').textContent = "It's a draw!";
+            } else {
+                document.getElementById('status').textContent = `Player ${winner} wins!`;
+                if (winner === 1) player1Score++;
+                if (winner === 2) player2Score++;
+                updateScores();
+            }
+            rematchButton.classList.remove('hidden');
         });
     </script>
 </body>
