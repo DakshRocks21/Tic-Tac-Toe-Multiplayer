@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 from flask_socketio import SocketIO, join_room, leave_room, emit
 import gevent.monkey
 
@@ -26,16 +26,30 @@ def index():
     return render_template('index.html')
 
 @app.route('/room/<room_id>/<int:size>')
-def room(room_id, size):
+def create_room(room_id, size):
+    password = request.args.get('password')
     if room_id not in rooms:
         rooms[room_id] = {
             'players': [],
             'board': [''] * (size * size),
             'size': size,
             'turn': 1,  # Player 1 starts
-            'scores': {1: 0, 2: 0}
+            'scores': {1: 0, 2: 0},
+            'password': password
         }
+    else:
+        return "Room already exists!", 400
     return render_template('room.html', room_id=room_id, size=size)
+
+@app.route('/join/<room_id>')
+def join_room_view(room_id):
+    password = request.args.get('password')
+    if room_id in rooms:
+        if rooms[room_id]['password'] == password:
+            return render_template('room.html', room_id=room_id, size=rooms[room_id]['size'])
+        else:
+            return "Incorrect password!", 403
+    return "Room not found!", 404
 
 @socketio.on('join')
 def handle_join(data):
@@ -55,7 +69,7 @@ def handle_join(data):
 @socketio.on('make_move')
 def handle_make_move(data):
     room_id = data['room_id']
-    move = data['move']
+    move = int(data['move'])
     size = rooms[room_id]['size']
     player = next((player for player in rooms[room_id]['players'] if player['sid'] == request.sid), None)
 
@@ -64,8 +78,10 @@ def handle_make_move(data):
             rooms[room_id]['board'][move] = 'X' if player['player_number'] == 1 else 'O'
             if check_winner(rooms[room_id]['board'], size):
                 rooms[room_id]['scores'][player['player_number']] += 1
+                emit('move_made', {'move': move, 'player': player['player_number']}, room=room_id)
                 emit('game_over', {'winner': player['player_number']}, room=room_id)
             elif all(cell != '' for cell in rooms[room_id]['board']):
+                emit('move_made', {'move': move, 'player': player['player_number']}, room=room_id)
                 emit('game_over', {'winner': 0}, room=room_id)
             else:
                 rooms[room_id]['turn'] = 2 if player['player_number'] == 1 else 1

@@ -20,7 +20,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
+            font-size: 2rem;
             font-weight: bold;
             background-color: #f0f0f0;
             border: 2px solid #333;
@@ -49,7 +49,7 @@
         .player2 {
             color: #f87171;
         }
-        
+
         #scoreboard {
             display: flex;
             justify-content: space-between;
@@ -113,7 +113,7 @@
         <div id="game" class="grid"></div>
         <button id="rematch-button" class="mt-6 bg-green-500 text-white px-4 py-2 rounded hidden">Rematch</button>
         <button id="leave-room" class="mt-6 bg-red-500 text-white px-4 py-2 rounded">Leave Room</button>
-        
+
         <div id="chat-box">
             <div id="messages"></div>
             <div id="message-input">
@@ -217,6 +217,7 @@
             const cell = event.target;
             if (cell.classList.contains('cell') && turn === playerNumber && !cell.classList.contains('disabled')) {
                 const move = cell.dataset.index;
+                console.log(`Move triggered: ${move}, Player: ${playerNumber}, Room: ${roomId}`);
                 socket.emit('make_move', { room_id: roomId, move: move });
             }
         });
@@ -245,6 +246,7 @@
         }
 
         socket.on('move_made', (data) => {
+            console.log("Move made received:", data);
             const { move, player } = data;
             const cell = document.querySelector(`.cell[data-index='${move}']`);
             cell.textContent = player === 1 ? 'X' : 'O';
