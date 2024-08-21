@@ -63,22 +63,7 @@ def check_winner(board, size):
 @app.route('/')
 def index():
     return render_template('index.html')
-@app.route('/room/<room_id>/<int:size>')
-def create_room(room_id, size):
-    password = request.args.get('password')
-    # Use the new Session.get() method instead of the legacy Query.get()
-    if not db.session.get(Room, room_id):
-        new_room = Room(
-            id=room_id,
-            size=size,
-            board=' ' * (size * size),  # Initialize board as a string of spaces
-            password=password
-        )
-        db.session.add(new_room)
-        db.session.commit()
-    else:
-        return "Room already exists!", 400
-    return render_template('room.html', room_id=room_id, size=size)
+
 
 @socketio.on('join')
 def handle_join(data):
@@ -116,13 +101,26 @@ def handle_join(data):
 
         emit('room_joined', {'room_id': room_id, 'board': room.board, 'size': size}, room=room_id)
         
+@app.route('/room/<room_id>/<int:size>')
+def create_room(room_id, size):
+    password = request.args.get('password')
+    if not db.session.get(Room, room_id):
+        new_room = Room(
+            id=room_id,
+            size=int(size),
+            board=' ' * (size * size), 
+            password=password
+        )
+        db.session.add(new_room)
+        db.session.commit()
+    else:
+        return "Room already exists!", 400
+    return render_template('room.html', room_id=room_id, size=size)
+
 @app.route('/join/<room_id>')
 def join_room_view(room_id):
     password = request.args.get('password')
-    
-    # Fetch room using the new recommended method
     room = db.session.get(Room, room_id)
-    
     if room:
         if room.password == password:
             return render_template('room.html', room_id=room_id, size=room.size)
@@ -132,6 +130,7 @@ def join_room_view(room_id):
 
 @socketio.on('make_move')
 def handle_make_move(data):
+    print("hello world")
     room_id = data['room_id']
     move = int(data['move'])
     room = Room.query.get(room_id)

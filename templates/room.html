@@ -142,6 +142,7 @@
         let boardSize = '{{ size }}';
         let player1Score = 0;
         let player2Score = 0;
+        console.log(boardSize);
 
         function createBoard(size) {
             grid.innerHTML = '';
@@ -152,6 +153,8 @@
                 cell.dataset.index = i;
                 grid.appendChild(cell);
             }
+            turn = 1;
+            updateTurnDisplay();
         }
 
         function updateScores() {
@@ -187,7 +190,8 @@
             updateTurnDisplay();
         });
 
-        socket.on('move_made', (data) => {
+        socket.on('make_move', (data) => {
+            console.log(data);
             const { move, player } = data;
             const cell = document.querySelector(`.cell[data-index='${move}']`);
             cell.textContent = player === 1 ? 'X' : 'O';
@@ -197,6 +201,7 @@
         });
 
         socket.on('game_over', (data) => {
+            console.log(data);
             const winner = data.winner;
             if (winner === 0) {
                 document.getElementById('status').textContent = "It's a draw!";
@@ -216,6 +221,7 @@
         socket.on('start_rematch', (data) => {
             createBoard(data.size);
             document.getElementById('status').textContent = 'Player 1\'s turn';
+
             rematchButton.classList.add('hidden');
         });
 
@@ -224,6 +230,7 @@
         });
 
         grid.addEventListener('click', (event) => {
+            console.log(turn, playerNumber);
             const cell = event.target;
             if (cell.classList.contains('cell') && turn === playerNumber && !cell.classList.contains('disabled')) {
                 const move = cell.dataset.index;
@@ -295,12 +302,16 @@
         }
 
         socket.on('move_made', (data) => {
+            console.log(data);
             const { move, player } = data;
             const cell = document.querySelector(`.cell[data-index='${move}']`);
             cell.textContent = player === 1 ? 'X' : 'O';
             cell.classList.add('disabled');
             playSound('move');
-            turn = player === 1 ? 2 : 1;
+
+            if (player === playerNumber) {
+                turn = player === 1 ? 2 : 1;
+            }
             updateTurnDisplay();
         });
 
