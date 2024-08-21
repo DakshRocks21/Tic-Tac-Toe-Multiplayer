@@ -99,6 +99,10 @@
             color: white;
             border-radius: 0 4px 4px 0;
         }
+
+        #waiting-indicator {
+            display: none;
+        }
     </style>
 </head>
 
@@ -113,6 +117,10 @@
         <div id="game" class="grid"></div>
         <button id="rematch-button" class="mt-6 bg-green-500 text-white px-4 py-2 rounded hidden">Rematch</button>
         <button id="leave-room" class="mt-6 bg-red-500 text-white px-4 py-2 rounded">Leave Room</button>
+
+        <div id="waiting-indicator" class="text-center text-xl text-gray-600">
+            Waiting for the other player to reconnect...
+        </div>
 
         <div id="chat-box">
             <div id="messages"></div>
@@ -170,11 +178,13 @@
             createBoard(data.size);
             const cells = document.querySelectorAll('.cell');
             cells.forEach((cell, index) => {
-                if (data.board[index] !== '') {
+                if (data.board[index] !== ' ') {
                     cell.textContent = data.board[index];
                     cell.classList.add('disabled');
                 }
             });
+            turn = data.turn;
+            updateTurnDisplay();
         });
 
         socket.on('move_made', (data) => {
@@ -183,7 +193,7 @@
             cell.textContent = player === 1 ? 'X' : 'O';
             cell.classList.add('disabled');
             turn = player === 1 ? 2 : 1;
-            document.getElementById('status').textContent = `Player ${turn}'s turn`;
+            updateTurnDisplay();
         });
 
         socket.on('game_over', (data) => {
@@ -223,6 +233,7 @@
         });
 
         // Chat functionality
+        // Chat functionality
         document.getElementById('send-message').addEventListener('click', () => {
             const message = document.getElementById('chat-message').value;
             if (message.trim() !== '') {
@@ -232,12 +243,50 @@
         });
 
         socket.on('receive_message', (data) => {
+            addMessageToChat(data.player, data.message);
+        });
+
+        // Load chat history on room join or reconnect
+        socket.on('chat_history', (data) => {
+            const messages = document.getElementById('messages');
+            messages.innerHTML = ''; // Clear existing messages
+            data.forEach(msg => {
+                addMessageToChat(msg.player, msg.message);
+            });
+        });
+
+        function addMessageToChat(player, message) {
             const messages = document.getElementById('messages');
             const newMessage = document.createElement('p');
-            newMessage.textContent = `Player ${data.player}: ${data.message}`;
+            newMessage.textContent = `Player ${player}: ${message}`;
             messages.appendChild(newMessage);
             messages.scrollTop = messages.scrollHeight;
+        }
+
+        socket.on('connect', () => {
+            if (playerNumber) {
+                // Reconnect to the room
+                socket.emit('reconnect', { room_id: roomId });
+            } else {
+                // Join room as usual
+                socket.emit('join', { room_id: roomId, size: boardSize });
+            }
         });
+
+
+        socket.on('player_disconnected', (data) => {
+            document.getElementById('waiting-indicator').style.display = 'block';
+            document.getElementById('status').textContent = `Player ${data.player_number} disconnected. Waiting for reconnection...`;
+        });
+
+        socket.on('player_reconnected', (data) => {
+            document.getElementById('waiting-indicator').style.display = 'none';
+            updateTurnDisplay();
+        });
+
+        function updateTurnDisplay() {
+            document.getElementById('status').textContent = `Player ${turn}'s turn`;
+        }
 
         // Sound effects
         function playSound(sound) {
@@ -246,14 +295,13 @@
         }
 
         socket.on('move_made', (data) => {
-            console.log("Move made received:", data);
             const { move, player } = data;
             const cell = document.querySelector(`.cell[data-index='${move}']`);
             cell.textContent = player === 1 ? 'X' : 'O';
             cell.classList.add('disabled');
             playSound('move');
             turn = player === 1 ? 2 : 1;
-            document.getElementById('status').textContent = `Player ${turn}'s turn`;
+            updateTurnDisplay();
         });
 
         socket.on('game_over', (data) => {

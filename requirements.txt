@@ -3,3 +3,4 @@ flask-socketio
 redis
 gevent
 gevent-websocket
+sqlalchemy
