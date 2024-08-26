@@ -51,6 +51,8 @@ This project is a web-based multiplayer Tic Tac Toe game built using Flask, Flas
 
 ## Running the Project
 
+You can use, `docker compose up` or run it yourself by following the instruction below
+
 Firstly, create a virtual env, 
 ```
 python3 -m venv venv && source venv/bin/activate
