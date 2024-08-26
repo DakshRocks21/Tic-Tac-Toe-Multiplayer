@@ -51,6 +51,16 @@ This project is a web-based multiplayer Tic Tac Toe game built using Flask, Flas
 
 ## Running the Project
 
+Firstly, create a virtual env, 
+```
+python3 -m venv venv && source venv/bin/activate
+```
+
+Secondly, install the requirements by running
+```bash
+pip install -r requirements.txt
+```
+
 To start the application, simply run:
 
 ```bash
